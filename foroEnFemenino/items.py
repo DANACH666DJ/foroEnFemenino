@@ -30,4 +30,10 @@ class ForoenfemeninoItem(scrapy.Item):
     user_question_surname = scrapy.Field()
     user_question_age = scrapy.Field()
     user_question_location = scrapy.Field()
+    # esto no estaba cuando funcionaba
+    user_answer_sex = scrapy.Field()
+    user_answer_name = scrapy.Field()
+    user_answer_surname = scrapy.Field()
+    user_answer_age = scrapy.Field()
+    user_answer_location = scrapy.Field()
     pass

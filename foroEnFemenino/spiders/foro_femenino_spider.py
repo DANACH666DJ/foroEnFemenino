@@ -56,14 +56,15 @@ class foroEnFemenino(scrapy.Spider):
             meta['subject_user'] = subject_user
             meta['subject_num_answer'] = subject_num_answer
             meta['subject_date_last_post'] = subject_date_last_post
-            yield scrapy.Request(subject_url, callback=self.parse_urlsPagPost, meta=meta)
+            if subject_url == "http://salud.enfemenino.com/foro/nuevas-fotos-aumento-a-los-7-dias-submuscular-390cc-fd984676":
+                yield scrapy.Request(subject_url, callback=self.parse_urlsPagPost, meta=meta)
 
-        '''
+
         # paginación de la página de asuntos
-        next_page = response.xpath('//nav[@class="af-pagination "]//li[@class="selected"]/following-sibling::li/a/text()').extract_first()
+        next_page = response.xpath('//nav[@class="af-pagination "]//li[@class="selected"]/following-sibling::li/a/@href').extract_first()
         if not next_page is None:
             yield scrapy.Request(next_page, callback=self.parse_urlsPagAsuntos, meta=response.meta)
-        '''
+
 
     def parse_urlsPagPost(self, response):
         # recibo los datos del  meta
@@ -90,9 +91,22 @@ class foroEnFemenino(scrapy.Spider):
         meta['post_date_answer'] = None
         meta['post_text_answer'] = None
 
+        meta['user_question_sex'] = None
+        meta['user_question_age'] = None
+        meta['user_question_location'] = None
+        meta['user_question_name'] = None
+        meta['user_question_surname'] = None
+
+        meta['user_answer_sex'] = None
+        meta['user_answer_age'] = None
+        meta['user_answer_location'] = None
+        meta['user_answer_name'] = None
+        meta['user_answer_surname'] = None
+
         # si no tiene respuestas lo creo sólo con la preguntas
-        url = urlparse.urljoin("http://www.enfemenino.com/mi-espacio/", post_user_question)
-        yield scrapy.Request(url, callback=self.parse_user, meta=meta, dont_filter=True)
+        url_user_question = urlparse.urljoin("http://www.enfemenino.com/mi-espacio/", post_user_question)
+        meta['url_user_question'] = url_user_question
+        yield scrapy.Request(url_user_question, callback=self.parse_user, meta=meta, dont_filter=True)
 
         # creo un xpath que recorre todos los userPost,totalMesUser,date,post_group,post_member_group y textPost
         items = response.xpath('//div[@class="af-post"]')
@@ -115,24 +129,54 @@ class foroEnFemenino(scrapy.Spider):
                 meta['post_user_answer'] = post_user_answer
                 meta['post_date_answer'] = post_date_answer
                 meta['post_text_answer'] = post_text_answer
-                url = urlparse.urljoin("http://www.enfemenino.com/mi-espacio/", post_user_question)
-                yield scrapy.Request(url, callback=self.parse_user, meta=meta, dont_filter=True)
 
-        '''
+                # antes estaba con el post user question y funcionaba(sin el meta )
+                url_user_answer = urlparse.urljoin("http://www.enfemenino.com/mi-espacio/", post_user_answer)
+                yield scrapy.Request(url_user_answer, callback=self.parse_user_answer, meta=meta, dont_filter=True)
+
         # paginación de la página de asuntos
-        next_page = response.xpath('//nav[@class="af-pagination light"]//li[@class="selected"]/following-sibling::li/a/text()').extract_first()
+        next_page = response.xpath(
+            '//nav[@class="af-pagination light next-button"]//li[@class="selected"]/following-sibling::li/a/@href').extract_first()
         if not next_page is None:
-            yield scrapy.Request(next_page, callback=self.parse_urlsPagAsuntos, meta=response.meta)
-        '''
+            print "*****************", next_page
+            yield scrapy.Request(next_page, callback=self.parse_urlsPagPost, meta=response.meta)
+
+    # PRUEBAAAAAA METODO
+    def parse_user_answer(self, response):
+        meta = response.meta
+        url_user_question = meta['url_user_question']
+        # si recibo la url del user answer creo sus datos(esto no estaba cuando funcionaba)
+        for nodes in response.xpath('//table[1]//td/font[@class="afmod_contentB"]'):
+            nombre = nodes.xpath('text()').extract()
+            nombre = str(nombre[0])
+            # transformo el nombre a utf8
+            nombre = unicode(nombre, "utf-8")
+            if nombre == "Sexo":
+                user_answer_sex = nodes.xpath(
+                    '../following-sibling::td//a[@class="afmod_content"]/text()').extract_first()
+                meta['user_answer_sex'] = user_answer_sex
+            if nombre == "Nombre":
+                user_answer_name = nodes.xpath(
+                    '../following-sibling::td//a[@class="afmod_content"]/text()').extract_first()
+                meta['user_answer_name'] = user_answer_name
+            if nombre == "Apellidos":
+                user_answer_surname = nodes.xpath(
+                    '../following-sibling::td//a[@class="afmod_content"]/text()').extract_first()
+                meta['user_answer_surname'] = user_answer_surname
+            if nombre == "Edad":
+                user_answer_age = nodes.xpath(
+                    '../following-sibling::td//a[@class="afmod_content"]/text()').extract_first()
+                meta['user_answer_age'] = user_answer_age
+            if nombre == "Lugar":
+                user_answer_location = nodes.xpath(
+                    '../following-sibling::td//a[@class="afmod_content"]/text()').extract()
+                if not user_answer_location == []:
+                    meta['user_answer_location'] = user_answer_location
+        yield scrapy.Request(url_user_question, callback=self.parse_user, meta=meta, dont_filter=True)
 
     def parse_user(self, response):
         # recibo los datos
         meta = response.meta
-        meta['user_question_sex'] = None
-        meta['user_question_age'] = None
-        meta['user_question_location'] = None
-        meta['user_question_name'] = None
-        meta['user_question_surname'] = None
         for nodes in response.xpath('//table[1]//td/font[@class="afmod_contentB"]'):
             nombre = nodes.xpath('text()').extract()
             nombre = str(nombre[0])
@@ -159,6 +203,7 @@ class foroEnFemenino(scrapy.Spider):
                     '../following-sibling::td//a[@class="afmod_content"]/text()').extract()
                 if not user_question_location == []:
                     meta['user_question_location'] = user_question_location
+
         yield self.create_item(meta)
 
     def clean_and_flatten(self, text_list):
@@ -194,4 +239,10 @@ class foroEnFemenino(scrapy.Spider):
         item['user_question_surname'] = meta['user_question_surname']
         item['user_question_age'] = meta['user_question_age']
         item['user_question_location'] = meta['user_question_location']
+        # esto no estaba cuando funcionaba
+        item['user_answer_sex'] = meta['user_answer_sex']
+        item['user_answer_name'] = meta['user_answer_name']
+        item['user_answer_surname'] = meta['user_answer_surname']
+        item['user_answer_age'] = meta['user_answer_age']
+        item['user_answer_location'] = meta['user_answer_location']
         return item
