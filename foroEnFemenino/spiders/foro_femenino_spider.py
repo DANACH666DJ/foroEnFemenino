@@ -56,57 +56,59 @@ class foroEnFemenino(scrapy.Spider):
             meta['subject_user'] = subject_user
             meta['subject_num_answer'] = subject_num_answer
             meta['subject_date_last_post'] = subject_date_last_post
-            if subject_url == "http://salud.enfemenino.com/foro/nuevas-fotos-aumento-a-los-7-dias-submuscular-390cc-fd984676":
+            if subject_url == "http://salud.enfemenino.com/foro/grupo-de-ayuda-para-bajar-de-peso-fd185200":
                 yield scrapy.Request(subject_url, callback=self.parse_urlsPagPost, meta=meta)
 
-
+        '''
         # paginación de la página de asuntos
         next_page = response.xpath('//nav[@class="af-pagination "]//li[@class="selected"]/following-sibling::li/a/@href').extract_first()
         if not next_page is None:
             yield scrapy.Request(next_page, callback=self.parse_urlsPagAsuntos, meta=response.meta)
-
+        '''
 
     def parse_urlsPagPost(self, response):
         # recibo los datos del  meta
+        print "****************OOOOOOOOOOOOOOOOOO"
         meta = response.meta
         post_title = response.xpath('//div[@class="af-post-title"]/h1/a/text()').extract_first()
         # puesto que solo hay una pregunta en cada post,cogo el user de la pregunta,el texto y la fecha
         post_user_question = response.xpath(
             '//div[@class="af-post first"]//span[@class="user-name-value"]/text()').extract_first()
-        post_date_question = response.xpath(
-            '//div[@class="af-post first"]//span[@class="date"]/text()').extract_first().strip()
-        post_text_question = response.xpath('//div[@class="af-post first"]//p[@class="af-message"]/text()').extract()
-        # cogemos el texto y lo metemos como parametro al metodo clean para que nos deje solo el texto sin espacios
-        post_text_question = self.clean_and_flatten(post_text_question)
-        # cast de post_text a string ,puesto que necesitamos transformarlo a utf-8
-        post_text_question = str(post_text_question)
-        # transformo el post_text a utf8
-        post_text_question = unicode(post_text_question, "utf-8")
-        # le añado al meta que recibo mas datos
-        meta['post_title'] = post_title
-        meta['post_user_question'] = post_user_question
-        meta['post_date_question'] = post_date_question
-        meta['post_text_question'] = post_text_question
-        meta['post_user_answer'] = None
-        meta['post_date_answer'] = None
-        meta['post_text_answer'] = None
+        if post_user_question is not None:
+            post_date_question = response.xpath(
+                '//div[@class="af-post first"]//span[@class="date"]/text()').extract_first().strip()
+            post_text_question = response.xpath('//div[@class="af-post first"]//p[@class="af-message"]/text()').extract()
+            # cogemos el texto y lo metemos como parametro al metodo clean para que nos deje solo el texto sin espacios
+            post_text_question = self.clean_and_flatten(post_text_question)
+            # cast de post_text a string ,puesto que necesitamos transformarlo a utf-8
+            post_text_question = str(post_text_question)
+            # transformo el post_text a utf8
+            post_text_question = unicode(post_text_question, "utf-8")
+            # le añado al meta que recibo mas datos
+            meta['post_title'] = post_title
+            meta['post_user_question'] = post_user_question
+            meta['post_date_question'] = post_date_question
+            meta['post_text_question'] = post_text_question
+            meta['post_user_answer'] = None
+            meta['post_date_answer'] = None
+            meta['post_text_answer'] = None
 
-        meta['user_question_sex'] = None
-        meta['user_question_age'] = None
-        meta['user_question_location'] = None
-        meta['user_question_name'] = None
-        meta['user_question_surname'] = None
+            meta['user_question_sex'] = None
+            meta['user_question_age'] = None
+            meta['user_question_location'] = None
+            meta['user_question_name'] = None
+            meta['user_question_surname'] = None
 
-        meta['user_answer_sex'] = None
-        meta['user_answer_age'] = None
-        meta['user_answer_location'] = None
-        meta['user_answer_name'] = None
-        meta['user_answer_surname'] = None
+            meta['user_answer_sex'] = None
+            meta['user_answer_age'] = None
+            meta['user_answer_location'] = None
+            meta['user_answer_name'] = None
+            meta['user_answer_surname'] = None
 
-        # si no tiene respuestas lo creo sólo con la preguntas
-        url_user_question = urlparse.urljoin("http://www.enfemenino.com/mi-espacio/", post_user_question)
-        meta['url_user_question'] = url_user_question
-        yield scrapy.Request(url_user_question, callback=self.parse_user, meta=meta, dont_filter=True)
+            # si no tiene respuestas lo creo sólo con la preguntas
+            url_user_question = urlparse.urljoin("http://www.enfemenino.com/mi-espacio/", post_user_question)
+            meta['url_user_question'] = url_user_question
+            yield scrapy.Request(url_user_question, callback=self.parse_user, meta=meta, dont_filter=True)
 
         # creo un xpath que recorre todos los userPost,totalMesUser,date,post_group,post_member_group y textPost
         items = response.xpath('//div[@class="af-post"]')
@@ -134,12 +136,19 @@ class foroEnFemenino(scrapy.Spider):
                 url_user_answer = urlparse.urljoin("http://www.enfemenino.com/mi-espacio/", post_user_answer)
                 yield scrapy.Request(url_user_answer, callback=self.parse_user_answer, meta=meta, dont_filter=True)
 
-        # paginación de la página de asuntos
+        # paginación de la página de asuntos creamos dos querys puesto que al pasar por la primera pag cambia la query
         next_page = response.xpath(
             '//nav[@class="af-pagination light next-button"]//li[@class="selected"]/following-sibling::li/a/@href').extract_first()
-        if not next_page is None:
-            print "*****************", next_page
-            yield scrapy.Request(next_page, callback=self.parse_urlsPagPost, meta=response.meta)
+        next_page_pag = response.xpath(
+            '//nav[@class="af-pagination light prev-button next-button"]//li[@class="selected"]/following-sibling::li/a/@href').extract_first()
+        if not next_page is None or not next_page_pag is None:
+            #para hacer un request con una u otra query
+            if not next_page is None:
+                yield scrapy.Request(next_page, callback=self.parse_urlsPagPost, meta=response.meta)
+                print "*****************", next_page
+            if not next_page_pag is None:
+                yield scrapy.Request(next_page_pag, callback=self.parse_urlsPagPost, meta=response.meta)
+                print "*****************", next_page_pag
 
     # PRUEBAAAAAA METODO
     def parse_user_answer(self, response):
@@ -172,6 +181,7 @@ class foroEnFemenino(scrapy.Spider):
                     '../following-sibling::td//a[@class="afmod_content"]/text()').extract()
                 if not user_answer_location == []:
                     meta['user_answer_location'] = user_answer_location
+
         yield scrapy.Request(url_user_question, callback=self.parse_user, meta=meta, dont_filter=True)
 
     def parse_user(self, response):
@@ -216,8 +226,7 @@ class foroEnFemenino(scrapy.Spider):
 
         return "\n".join(clean_text).strip()
 
-        # método para armar el item con los datos que hemos ido añadiendo al meta
-
+    # método para armar el item con los datos que hemos ido añadiendo al meta
     def create_item(self, meta):
         item = ForoenfemeninoItem()
         item['forum_url'] = meta['forum_url']
